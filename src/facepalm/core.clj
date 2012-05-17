@@ -1,12 +1,13 @@
 (ns facepalm.core
   (:gen-class)
-  (:use [kameleon.core]
+  (:use [clojure.java.io :only [reader]]
+        [clojure.tools.cli :only [cli]]
+        [kameleon.core]
         [kameleon.entities]
-        [kameleon.pgpass]
         [korma.core]
-        [korma.db]
-        [clojure.tools.cli])
-  (:require [clojure.tools.logging :as log])
+        [korma.db])
+  (:require [clojure.tools.logging :as log]
+            [kameleon.pgpass :as pgpass])
   (:import [org.apache.log4j BasicConfigurator ConsoleAppender Level
             SimpleLayout]))
 
@@ -32,6 +33,19 @@
      (.setName "Console")
      (.setThreshold (if (:debug opts) Level/DEBUG Level/INFO)))))
 
+(defn- get-password
+  "Attempts to obtain the database password from the user's .pgpass file.  If
+   the password can't be obtained from .pgpass, prompts the user for the
+   password"
+  [host port database user]
+  (let [password (pgpass/get-password host port database user)]
+    (if (nil? password)
+      (do
+        (print "Password: ")
+        (flush)
+        (apply str (.. System console readPassword)))
+      password)))
+
 (defn- define-db
   "Defines the database connection settings."
   [{:keys [host port database user]}]
@@ -51,4 +65,5 @@
       (System/exit 0))
     (configure-logging opts)
     (define-db opts)
+    (exec-raw ["INSERT INTO users (username) VALUES ('foo@iplantcollaborative.org');"])
     (println (select users))))
