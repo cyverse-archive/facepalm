@@ -6,7 +6,8 @@
                  [korma "0.3.0-beta7"]
                  [org.iplantc/kameleon "0.0.1-SNAPSHOT"]
                  [postgresql "9.0-801.jdbc4"]
-                 [slingshot "0.10.2"]]
+                 [slingshot "0.10.2"]
+                 [clj-http "0.4.1"]]
   :plugins [[lein-marginalia "0.7.0"]]
   :aot [facepalm.core]
   :main facepalm.core)
