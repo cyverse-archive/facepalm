@@ -243,14 +243,24 @@
                "CREATE SCHEMA public"
                (str "ALTER SCHEMA public OWNER TO " user)])))
 
+(defn- log-next-exception
+  "Calls getNextException and logs the resulting exception for any SQL
+   exception in the cause stack."
+  [e]
+  (when-not (nil? e)
+    (if (instance? SQLException e)
+      (log/error (.getNextException e) "next exception"))
+    (recur (.getCause e))))
+
 (defn- apply-database-init-scripts
   "Applies the database initialization scripts to the database."
   [dir opts]
-  (try
+  (try+
     (refresh-public-schema (:user opts))
     (dorun (map #(load-sql-files dir %) ["tables" "views" "data"]))
-    (catch SQLException e
-      (println "Error updating database:" (.. e getNextException getMessage)))))
+    (catch Exception e
+      (log-next-exception e)
+      (throw+))))
 
 (defn- initialize-database
   "Initializes the database using a database archive obtained from a well-known
