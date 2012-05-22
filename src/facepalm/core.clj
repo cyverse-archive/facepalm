@@ -8,7 +8,8 @@
         [korma.core]
         [korma.db]
         [slingshot.slingshot :only [throw+ try+]])
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.string :as string]
+            [clojure.tools.logging :as log]
             [clj-http.client :as client]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File]
@@ -40,14 +41,21 @@
        ["-U" "--user" "The database username." :default "de"]
        ["-j" "--job" "The name of DE database job in Jenkins."
         :default "database"]
+       ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
        ["--debug" "Enable debugging." :default false :flag true]))
+
+(defn- create-layout
+  "Creates the layout that will be used for log messages."
+  []
+  (doto (SimpleLayout.)
+    (.activateOptions)))
 
 (defn- configure-logging
   "Configures logging for this tool.  All logging is printed on the console,
    but the logging level may be changed."
   [opts]
   (BasicConfigurator/configure
-   (doto (ConsoleAppender.)
+   (doto (ConsoleAppender. (create-layout))
      (.setLayout (SimpleLayout.))
      (.setName "Console")
      (.setThreshold (if (:debug opts) Level/DEBUG Level/INFO)))))
@@ -79,8 +87,10 @@
   "Returns the URL used to obtain the build artifact from Jenkins.  We assume
    that the name of the artifiact is database.tar.gz."
   [job-name]
-  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
-       build-artifact-name))
+  (let [url (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
+                 build-artifact-name)]
+    (log/debug "Build artifact URL:" url)
+    url))
 
 (defn- get-build-artifact
   "Obtains the database build artifact from Jenkins."
@@ -113,6 +123,7 @@
    convenient to be able to stream standard output and standard error output to
    the user's terminal session."
   [& cmd]
+  (log/debug "Executing command:" (string/join " " cmd))
   (let [proc (.exec (Runtime/getRuntime) (into-array cmd))]
     (.addShutdownHook (Runtime/getRuntime)
                       (Thread. (fn [] (.destroy proc))))
@@ -142,6 +153,7 @@
   [f]
   (when (.isDirectory f)
     (dorun (map #(rec-delete %) (.listFiles f))))
+  (log/debug "deleting" (.getPath f))
   (.delete f))
 
 (defn- mk-temp-dir
@@ -150,6 +162,7 @@
   (loop [idx 0]
     (if-not (>= idx max-temp-dir-attempts)
       (let [f (name-fn idx)]
+        (log/debug "attempting to create temporary directory" (.getPath f))
         (if (.mkdir f) f (recur (inc idx))))
       nil)))
 
@@ -164,6 +177,7 @@
                :parent (.getPath parent)
                :prefix prefix
                :base   base}))
+    (log/debug "created temporary directory:" (.getPath temp-dir))
     temp-dir))
 
 (defmacro ^:private with-temp-dir
@@ -178,12 +192,19 @@
        ~@body
        (finally (rec-delete ~sym)))))
 
+(defn exec-sql-statement
+  "A wrapper around korma.core/exec-raw that logs the statement that is being
+   executed if debugging is enabled."
+  [statement]
+  (log/debug "executing SQL statement:" statement)
+  (exec-raw statement))
+
 (defn- load-sql-file
   "Loads a single SQL file into the database."
   [sql-file]
   (println (str "Loading " (.getName sql-file) "..."))
   (with-open [rdr (reader sql-file)]
-    (dorun (map exec-raw (sql-statements rdr)))))
+    (dorun (map exec-sql-statement (sql-statements rdr)))))
 
 (defn- load-sql-files
   "Loads SQL files from a subdirectory of the artifact directory."
@@ -211,7 +232,8 @@
       (println "Error updating database:" (.. e getNextException getMessage)))))
 
 (defn- initialize-database
-  "Initializes the database using "
+  "Initializes the database using a database archive obtained from a well-known
+   location."
   [opts]
   (with-temp-dir dir
     (get-build-artifact dir (:job opts))
@@ -226,5 +248,6 @@
       (println banner)
       (System/exit 0))
     (configure-logging opts)
+    (log/debug opts)
     (define-db opts)
     (initialize-database opts)))
