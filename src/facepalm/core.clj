@@ -21,6 +21,10 @@
   "The base URL used to connect to Jenkins."
   "http://projects.iplantcollaborative.org/hudson")
 
+(def ^:private qa-drop-base
+  "The base URL for the QA drops."
+  "http://projects.iplantcollaborative.org/qa-drops")
+
 (def ^:private build-artifact-name
   "The name of the build artifact to retrieve."
   "database.tar.gz")
@@ -43,6 +47,38 @@
         :default "database"]
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
        ["--debug" "Enable debugging." :default false :flag true]))
+
+(defn- pump
+  "Pumps data obtained from a reader to an output stream.  Copied shamelessly
+   from leiningen.core.eval/pump."
+  [reader out]
+  (let [buffer (char-array 1024)]
+    (loop [len (.read reader buffer)]
+      (when-not (neg? len)
+        (.write out buffer 0 len)
+        (.flush out)
+        (Thread/sleep 100)
+        (recur (.read reader buffer))))))
+
+(defn- sh
+  "A version of clojure.java.shell/sh that streams out/err.  Copied shamelessly
+   from leiningen.core.eval/sh.  This version of (sh) is being used because
+   clojure.java.shell/sh wasn't calling .destroy on the process, which was
+   preventing this program from exiting in a timely manner.  It's also
+   convenient to be able to stream standard output and standard error output to
+   the user's terminal session."
+  [& cmd]
+  (log/debug "Executing command:" (string/join " " cmd))
+  (let [proc (.exec (Runtime/getRuntime) (into-array cmd))]
+    (.addShutdownHook (Runtime/getRuntime)
+                      (Thread. (fn [] (.destroy proc))))
+    (with-open [out (reader (.getInputStream proc))
+                err (reader (.getErrorStream proc))]
+      (let [pump-out (doto (Thread. #(pump out *out*)) .start)
+            pump-err (doto (Thread. #(pump err *err*)) .start)]
+        (.join pump-out)
+        (.join pump-err))
+      (.waitFor proc))))
 
 (defn- create-layout
   "Creates the layout that will be used for log messages."
@@ -83,57 +119,42 @@
                :user user
                :password password})))
 
-(defn- build-artifact-url
+(defn- jenkins-build-artifact-url
   "Returns the URL used to obtain the build artifact from Jenkins.  We assume
    that the name of the artifiact is database.tar.gz."
   [job-name]
-  (let [url (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
-                 build-artifact-name)]
-    (log/debug "Build artifact URL:" url)
-    url))
+  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
+       build-artifact-name))
+
+(defn- qa-drop-build-artifact-url
+  "Returns the URL used to obtain the build artifact from a QA drop.  We assume
+   that the name of the artifact is database.tar.gz."
+  [drop-date]
+  (str qa-drop-base "/" drop-date "/" build-artifact-name))
+
+(defn- required-option-error
+  "Throws an exception indicating that required arguments are missing."
+  [& opt-names]
+  (throw+ {:type ::required-options-missing
+           :opt-names opt-names}))
+
+(defn- build-artifact-url
+  "Builds and returns the URL used to obtain the build artifact."
+  [{:keys [job qa-drop]}]
+  (cond (not (string/blank? qa-drop)) (qa-drop-build-artifact-url qa-drop)
+        (not (string/blank? job))     (jenkins-build-artifact-url job)
+        :else                         (required-option-error :job :qa-drop)))
 
 (defn- get-build-artifact
   "Obtains the database build artifact from Jenkins."
-  [dir job-name]
-  (println "Retrieving the" job-name "build artifact...")
-  (let [{:keys [status body]} (client/get (build-artifact-url job-name)
+  [dir opts]
+  (println "Retrieving the build artifact...")
+  (let [{:keys [status body]} (client/get (build-artifact-url opts)
                                           {:as :stream})]
     (if-not (< 199 status 300)
       (throw+ {:type ::build-artifact-retrieval-failed}))
     (with-open [in body]
       (copy in (file dir build-artifact-name)))))
-
-(defn- pump
-  "Pumps data obtained from a reader to an output stream.  Copied shamelessly
-   from leiningen.core.eval/pump."
-  [reader out]
-  (let [buffer (char-array 1024)]
-    (loop [len (.read reader buffer)]
-      (when-not (neg? len)
-        (.write out buffer 0 len)
-        (.flush out)
-        (Thread/sleep 100)
-        (recur (.read reader buffer))))))
-
-(defn- sh
-  "A version of clojure.java.shell/sh that streams out/err.  Copied shamelessly
-   from leiningen.core.eval/sh.  This version of (sh) is being used because
-   clojure.java.shell/sh wasn't calling .destroy on the process, which was
-   preventing this program from exiting in a timely manner.  It's also
-   convenient to be able to stream standard output and standard error output to
-   the user's terminal session."
-  [& cmd]
-  (log/debug "Executing command:" (string/join " " cmd))
-  (let [proc (.exec (Runtime/getRuntime) (into-array cmd))]
-    (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. (fn [] (.destroy proc))))
-    (with-open [out (reader (.getInputStream proc))
-                err (reader (.getErrorStream proc))]
-      (let [pump-out (doto (Thread. #(pump out *out*)) .start)
-            pump-err (doto (Thread. #(pump err *err*)) .start)]
-        (.join pump-out)
-        (.join pump-err))
-      (.waitFor proc))))
 
 (defn- unpack-build-artifact
   "Unpacks the database build artifact after it has been obtained."
@@ -236,7 +257,7 @@
    location."
   [opts]
   (with-temp-dir dir
-    (get-build-artifact dir (:job opts))
+    (get-build-artifact dir opts)
     (unpack-build-artifact dir)
     (apply-database-init-scripts dir opts)))
 
