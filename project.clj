@@ -14,4 +14,6 @@
                :type :command
                :release 1}
   :aot [facepalm.core]
-  :main facepalm.core)
+  :main facepalm.core
+  :repositories {"iplantCollaborative"
+                 "http://projects.iplantcollaborative.org/archiva/repository/internal/"})
