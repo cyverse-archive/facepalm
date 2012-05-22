@@ -4,15 +4,17 @@
         [clojure.tools.cli :only [cli]]
         [kameleon.core]
         [kameleon.entities]
+        [kameleon.sql-reader :only [sql-statements]]
         [korma.core]
         [korma.db]
-        [slingshot.slingshot :only [throw+]])
+        [slingshot.slingshot :only [throw+ try+]])
   (:require [clojure.tools.logging :as log]
             [clj-http.client :as client]
             [kameleon.pgpass :as pgpass])
-  (:import [org.apache.log4j BasicConfigurator ConsoleAppender Level
-            SimpleLayout]
-           [java.io File]))
+  (:import [java.io File]
+           [java.sql SQLException]
+           [org.apache.log4j BasicConfigurator ConsoleAppender Level
+            SimpleLayout]))
 
 (def ^:private jenkins-base
   "The base URL used to connect to Jenkins."
@@ -83,6 +85,7 @@
 (defn- get-build-artifact
   "Obtains the database build artifact from Jenkins."
   [dir job-name]
+  (println "Retrieving the" job-name "build artifact...")
   (let [{:keys [status body]} (client/get (build-artifact-url job-name)
                                           {:as :stream})]
     (if-not (< 199 status 300)
@@ -124,6 +127,7 @@
 (defn- unpack-build-artifact
   "Unpacks the database build artifact after it has been obtained."
   [dir]
+  (println "Unpacking the build artifact...")
   (let [file-path   (.getPath (file dir build-artifact-name))
         exit-status (sh "tar" "xvf" file-path "-C" (.getPath dir))]
     (when-not (zero? exit-status)
@@ -177,7 +181,9 @@
 (defn- load-sql-file
   "Loads a single SQL file into the database."
   [sql-file]
-  (println "Pretending to load" (.getName sql-file)))
+  (println (str "Loading " (.getName sql-file) "..."))
+  (with-open [rdr (reader sql-file)]
+    (dorun (map exec-raw (sql-statements rdr)))))
 
 (defn- load-sql-files
   "Loads SQL files from a subdirectory of the artifact directory."
@@ -186,13 +192,31 @@
     (dorun (map load-sql-file
                 (sort-by #(.getName %) (.listFiles subdir))))))
 
+(defn- refresh-public-schema
+  "Refreshes the public shema associated with the database."
+  [user]
+  (println "Refreshing the public schema...")
+  (dorun (map exec-raw
+              ["DROP SCHEMA public CASCADE"
+               "CREATE SCHEMA public"
+               (str "ALTER SCHEMA public OWNER TO " user)])))
+
+(defn- apply-database-init-scripts
+  "Applies the database initialization scripts to the database."
+  [dir opts]
+  (try
+    (refresh-public-schema (:user opts))
+    (dorun (map #(load-sql-files dir %) ["tables" "views" "data"]))
+    (catch SQLException e
+      (println "Error updating database:" (.. e getNextException getMessage)))))
+
 (defn- initialize-database
   "Initializes the database using "
   [opts]
   (with-temp-dir dir
     (get-build-artifact dir (:job opts))
     (unpack-build-artifact dir)
-    (dorun (map #(load-sql-files dir %) ["tables" "views" "data"]))))
+    (apply-database-init-scripts dir opts)))
 
 (defn -main
   "Parses the command-line options and performs the database updates."
