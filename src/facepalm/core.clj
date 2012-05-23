@@ -46,6 +46,7 @@
        ["-j" "--job" "The name of DE database job in Jenkins."
         :default "database"]
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
+       ["-f" "--filename" "An explicit path to the database tarball."]
        ["--debug" "Enable debugging." :default false :flag true]))
 
 (defn- pump
@@ -140,21 +141,35 @@
 
 (defn- build-artifact-url
   "Builds and returns the URL used to obtain the build artifact."
-  [{:keys [job qa-drop]}]
-  (cond (not (string/blank? qa-drop)) (qa-drop-build-artifact-url qa-drop)
-        (not (string/blank? job))     (jenkins-build-artifact-url job)
-        :else                         (required-option-error :job :qa-drop)))
+  [{:keys [qa-drop filename job]}]
+  (cond (not (string/blank? qa-drop))  (qa-drop-build-artifact-url qa-drop)
+        (not (string/blank? job))      (jenkins-build-artifact-url job)
+        :else                          (required-option-error :job :qa-drop)))
 
-(defn- get-build-artifact
-  "Obtains the database build artifact from Jenkins."
+(defn- get-build-artifact-from-url
+  "Gets the build artifact from a URL."
   [dir opts]
-  (println "Retrieving the build artifact...")
   (let [{:keys [status body]} (client/get (build-artifact-url opts)
                                           {:as :stream})]
     (if-not (< 199 status 300)
       (throw+ {:type ::build-artifact-retrieval-failed}))
     (with-open [in body]
       (copy in (file dir build-artifact-name)))))
+
+(defn get-build-artifact-from-file
+  "Gets the build artifact from a local file."
+  [dir filename]
+  (let [f (file filename)]
+    (copy f (file (file dir (.getName f))))))
+
+(defn- get-build-artifact
+  "Obtains the database build artifact."
+  [dir opts]
+  (println "Retrieving the build artifact...")
+  (let [filename (:filename opts)]
+    (if (string/blank? filename)
+      (get-build-artifact-from-url dir opts)
+      (get-build-artifact-from-file dir filename))))
 
 (defn- unpack-build-artifact
   "Unpacks the database build artifact after it has been obtained."
