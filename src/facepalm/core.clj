@@ -4,6 +4,7 @@
         [clojure.tools.cli :only [cli]]
         [kameleon.core]
         [kameleon.entities]
+        [kameleon.queries]
         [kameleon.sql-reader :only [sql-statements]]
         [korma.core]
         [korma.db]
