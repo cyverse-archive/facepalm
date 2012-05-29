@@ -12,11 +12,24 @@
   (:require [clojure.string :as string]
             [clojure.tools.logging :as log]
             [clj-http.client :as client]
+            [facepalm.c140-2012052501 :as c140-2012052501]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File]
            [java.sql SQLException]
            [org.apache.log4j BasicConfigurator ConsoleAppender Level
             SimpleLayout]))
+
+(declare initialize-database update-database)
+
+(defn- do-init
+  "The handler for the init mode."
+  [opts]
+  (initialize-database opts))
+
+(defn- do-update
+  "The handler for the update mode."
+  [opts]
+  (update-database opts))
 
 (def ^:private jenkins-base
   "The base URL used to connect to Jenkins."
@@ -34,11 +47,25 @@
   "The maximum number of times to attempt to create a temporary directory."
   10)
 
+(def ^:private modes
+  "The map of mode names to their helper functions."
+  {:init   do-init
+   :update do-update})
+
+(def ^:private modes-str
+  "The names of the modes, used in the help string for the --mode option."
+  (apply str (string/join " | " (map name (keys modes)))))
+
+(def ^:private conversions
+  {"1.4.0:20120525.01" c140-2012052501/convert})
+
 (defn- parse-args
   "Parses the command-line arguments."
   [args]
   (cli args
        ["-?" "--help" "Show help." :default false :flag true]
+       ["-m" "--mode" (str "The type of database update: [" modes-str "].")
+        :default "init"]
        ["-h" "--host" "The database hostname." :default "localhost"]
        ["-p" "--port" "The database port number." :default 5432
         :parse-fn #(Integer. %)]
@@ -287,6 +314,34 @@
     (unpack-build-artifact dir)
     (apply-database-init-scripts dir opts)))
 
+(defn- get-current-db-version
+  "Gets the current database version, defaulting to 1.2.0:20120101.01 if the
+   current version is nil or in a format that we don't recognize."
+  []
+  (let [ver (str (current-db-version))]
+    (if (or (nil? ver) (not (re-find #":" ver)))
+      "1.2.0:20120101.01"
+      ver)))
+
+(defn- get-update-versions
+  "Gets the list of versions to run database conversions for."
+  [current-version]
+  (drop-while #(< (compare % current-version) 0)
+              (take-while #(< (compare current-version %) 0)
+                          (sort (keys conversions)))))
+
+(defn- update-database
+  "Converts the database schema from one DE version to another."
+  [opts]
+  (let [current-version (get-current-db-version)
+        new-version     (compatible-db-version)
+        versions        (get-update-versions current-version)]
+    (try+
+     (dorun (map #((conversions %)) versions))
+     (catch Exception e
+       (log-next-exception e)
+       (throw+)))))
+
 (defn -main
   "Parses the command-line options and performs the database updates."
   [& args-vec]
@@ -294,7 +349,11 @@
     (when (:help opts)
       (println banner)
       (System/exit 0))
+    (cond)
     (configure-logging opts)
     (log/debug opts)
     (define-db opts)
-    (initialize-database opts)))
+    (let [mode-fn (modes (keyword (:mode opts)))]
+      (if-not (nil? mode-fn)
+        (mode-fn opts)
+        (throw+ {:type ::unknown-mode :mode (:mode opts)})))))
