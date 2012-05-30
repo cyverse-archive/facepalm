@@ -314,7 +314,7 @@
   (with-temp-dir dir
     (get-build-artifact dir opts)
     (unpack-build-artifact dir)
-    (apply-database-init-scripts dir opts)))
+    (transaction (apply-database-init-scripts dir opts))))
 
 (defn- get-current-db-version
   "Gets the current database version, defaulting to 1.2.0:20120101.01 if the
@@ -333,11 +333,11 @@
 
 (defn- do-conversion
   "Performs a databae conversion and updates the database version."
-  [version]
+  [new-version]
   (transaction
-   ((conversions version))
+   ((conversions new-version))
    (insert version
-           (values {:version version}))))
+           (values {:version new-version}))))
 
 (defn- update-database
   "Converts the database schema from one DE version to another."
@@ -347,7 +347,7 @@
         versions        (get-update-versions current-version)]
     (try+
      (dorun (map do-conversion
-                 (take-while #(<= (compare new-version %) 0) versions)))
+                 (take-while #(<= (compare % new-version) 0) versions)))
      (catch Exception e
        (log-next-exception e)
        (throw+)))))
