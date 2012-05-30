@@ -123,12 +123,6 @@
   (exec-raw "DROP SEQUENCE step_precedence_id_seq")
   (exec-raw "DROP TABLE thing_type_code"))
 
-(defn- update-version
-  "Updates the database version."
-  []
-  (println "\t* updating the database version")
-  (exec-raw (str "INSERT INTO version (version) VALUES ('" version "')")))
-
 (defn convert
   "Performs the conversion for database version 1.4.0:20120525.01."
   []
@@ -137,5 +131,4 @@
   (redefine-analysis-listing)
   (create-analysis-job-types)
   (redefine-version-table)
-  (drop-obsolete-tables)
-  (update-version))
+  (drop-obsolete-tables))

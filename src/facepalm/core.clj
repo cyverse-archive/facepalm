@@ -328,9 +328,16 @@
 (defn- get-update-versions
   "Gets the list of versions to run database conversions for."
   [current-version]
-  (drop-while #(< (compare % current-version) 0)
-              (take-while #(< (compare current-version %) 0)
-                          (sort (keys conversions)))))
+  (drop-while #(<= (compare % current-version) 0)
+              (sort (keys conversions))))
+
+(defn- do-conversion
+  "Performs a databae conversion and updates the database version."
+  [version]
+  (transaction
+   ((conversions version))
+   (insert version
+           (values {:version version}))))
 
 (defn- update-database
   "Converts the database schema from one DE version to another."
@@ -339,7 +346,8 @@
         new-version     (compatible-db-version)
         versions        (get-update-versions current-version)]
     (try+
-     (dorun (map #((conversions %)) versions))
+     (dorun (map do-conversion
+                 (take-while #(<= (compare new-version %) 0) versions)))
      (catch Exception e
        (log-next-exception e)
        (throw+)))))
