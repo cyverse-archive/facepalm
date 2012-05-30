@@ -24,8 +24,22 @@
         PRIMARY KEY(id)
     )"))
 
+(defn add-collaborators-table
+  "Adds the table used to track collaborators."
+  []
+  (println "\t* adding the collaborators table")
+  (exec-raw "CREATE SEQUENCE collaborators_id_seq")
+  (exec-raw
+   "CREATE TABLE collaborators (
+        id bigint DEFAULT nextval('collaborators_id_seq'),
+        user_id bigint NOT NULL references users(id),
+        collaborator_id bigint NOT NULL references users(id),
+        PRIMARY KEY(id)
+    )"))
+
 (defn convert
   "Performs the conversion for database version 1.4.0:20120530.01."
   []
   (println "Performing conversion for" version)
-  (add-genome-reference-table))
+  (add-genome-reference-table)
+  (add-collaborators-table))
