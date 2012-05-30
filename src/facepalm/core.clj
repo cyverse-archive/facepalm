@@ -13,6 +13,7 @@
             [clojure.tools.logging :as log]
             [clj-http.client :as client]
             [facepalm.c140-2012052501 :as c140-2012052501]
+            [facepalm.c140-2012053001 :as c140-2012053001]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File]
            [java.sql SQLException]
@@ -57,7 +58,8 @@
   (apply str (string/join " | " (map name (keys modes)))))
 
 (def ^:private conversions
-  {"1.4.0:20120525.01" c140-2012052501/convert})
+  {"1.4.0:20120525.01" c140-2012052501/convert}
+  {"1.4.0:20120530.01" c140-2012053001/convert})
 
 (defn- parse-args
   "Parses the command-line arguments."
