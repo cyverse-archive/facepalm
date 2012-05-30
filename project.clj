@@ -3,7 +3,7 @@
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
-                 [korma "0.3.0-beta7"]
+                 [korma "0.3.0-beta10"]
                  [org.iplantc/kameleon "0.0.1-SNAPSHOT"]
                  [postgresql "9.0-801.jdbc4"]
                  [slingshot "0.10.2"]
