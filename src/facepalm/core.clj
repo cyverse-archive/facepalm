@@ -58,8 +58,8 @@
   (apply str (string/join " | " (map name (keys modes)))))
 
 (def ^:private conversions
-  {"1.4.0:20120525.01" c140-2012052501/convert}
-  {"1.4.0:20120530.01" c140-2012053001/convert})
+  {"1.4.0:20120525.01" c140-2012052501/convert
+   "1.4.0:20120530.01" c140-2012053001/convert})
 
 (defn- parse-args
   "Parses the command-line arguments."
