@@ -13,9 +13,9 @@
   (exec-raw
    "CREATE TABLE genome_reference (
         id bigint DEFAULT nextval('genome_ref_id_seq'),
-        uuid uuid NOT NULL,
+        uuid char(36) UNIQUE NOT NULL,
         name varchar(512) NOT NULL,
-        path text NOT NULL,
+        path varchar(1024) NOT NULL,
         deleted boolean DEFAULT false NOT NULL,
         created_by bigint references users(id),
         created_on timestamp DEFAULT now() NOT NULL,
