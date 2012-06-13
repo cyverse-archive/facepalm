@@ -20,7 +20,7 @@
         created_by bigint references users(id),
         created_on timestamp DEFAULT now() NOT NULL,
         last_modified_by bigint references users(id),
-        last_modified_on timestamp,
+        last_modified_on timestamp DEFAULT now() NOT NULL,
         PRIMARY KEY(id)
     )"))
 
