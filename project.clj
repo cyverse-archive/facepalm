@@ -13,7 +13,7 @@
             [lein-marginalia "0.7.0"]]
   :iplant-rpm {:summary "Facepalm"
                :type :command
-               :release 3}
+               :release 4}
   :aot [facepalm.core]
   :main facepalm.core
   :repositories {"iplantCollaborative"
