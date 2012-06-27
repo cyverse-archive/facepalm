@@ -1,4 +1,10 @@
-(defproject facepalm "0.0.1-SNAPSHOT"
+
+;; IMPORTANT NOTE: Both an RPM and a tarball are generated for this project.
+;; Because the release number is not recorded anywhere in the tarball, minor
+;; changes need to be recorded in the version number.  Please increment the
+;; minor version number rather than the release number for minor changes.
+
+(defproject facepalm "1.0.0-SNAPSHOT"
   :description "Command-line utility for DE database managment."
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.cli "0.2.1"]
@@ -13,7 +19,7 @@
             [lein-marginalia "0.7.0"]]
   :iplant-rpm {:summary "Facepalm"
                :type :command
-               :release 4}
+               :release 1}
   :aot [facepalm.core]
   :main facepalm.core
   :repositories {"iplantCollaborative"
