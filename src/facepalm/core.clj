@@ -133,7 +133,7 @@
    (doto (ConsoleAppender. (create-layout))
      (.setLayout (SimpleLayout.))
      (.setName "Console")
-     (.setThreshold (if (:debug opts) Level/DEBUG Level/INFO)))))
+     (.setThreshold (if (:debug opts) Level/DEBUG Level/ERROR)))))
 
 (defn- get-password
   "Attempts to obtain the database password from the user's .pgpass file.  If
@@ -157,6 +157,15 @@
                :subname (str "//" host ":" port "/" database)
                :user user
                :password password})))
+
+(defn- test-db
+  "Test the database connection settings to ensure that the connection settings
+   are correct."
+  [{:keys [host port database user]}]
+  (try+
+   (transaction)
+   (catch Exception e
+     (database-connection-failure host port database user))))
 
 (defn- jenkins-build-artifact-url
   "Returns the URL used to obtain the build artifact from Jenkins.  We assume
@@ -380,4 +389,5 @@
     (log/debug opts)
     (trap banner
      (define-db opts)
+     (test-db opts)
      (exec-mode-fn opts))))

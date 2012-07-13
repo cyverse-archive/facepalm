@@ -32,7 +32,8 @@
    directory names."
   [template-name]
   (if-let [in (get-resource (str template-name ".fleet") (locale-dirnames))]
-    (fleet [data] (slurp in) {:escaping :bypass})))
+    (with-open [in in]
+      (fleet [data] (slurp in) {:escaping :bypass}))))
 
 (defn options-missing
   "Throws an exception indicating that required options are missing.  If
@@ -85,6 +86,17 @@
            :parent parent
            :prefix prefix
            :base   base}))
+
+(defn database-connection-failure
+  "Throws an exception indicating that the database connection attempt failed.
+   Usually, this means that the database credentials or connection settings
+   are wrong."
+  [host port database user]
+  (throw+ {:type ::database-connection-failure
+           :host     host
+           :port     port
+           :database database
+           :user     user}))
 
 (defn unknown-mode
   "Throws an exception indicating that the user specified an unknown mode of
