@@ -9,6 +9,7 @@
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
+                 [fleet "0.9.5"]
                  [korma "0.3.0-beta7"]
                  [org.iplantc/kameleon "0.0.1-SNAPSHOT"]
                  [postgresql "9.0-801.jdbc4"]

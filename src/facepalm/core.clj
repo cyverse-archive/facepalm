@@ -2,6 +2,7 @@
   (:gen-class)
   (:use [clojure.java.io :only [copy file reader]]
         [clojure.tools.cli :only [cli]]
+        [facepalm.error-codes]
         [kameleon.core]
         [kameleon.entities]
         [kameleon.queries]
@@ -17,7 +18,7 @@
             [facepalm.c140-2012061501 :as c140-2012061501]
             [facepalm.c140-2012061801 :as c140-2012061801]
             [kameleon.pgpass :as pgpass])
-  (:import [java.io File]
+  (:import [java.io File IOException]
            [java.sql SQLException]
            [org.apache.log4j BasicConfigurator ConsoleAppender Level
             SimpleLayout]))
@@ -104,16 +105,19 @@
    the user's terminal session."
   [& cmd]
   (log/debug "Executing command:" (string/join " " cmd))
-  (let [proc (.exec (Runtime/getRuntime) (into-array cmd))]
-    (.addShutdownHook (Runtime/getRuntime)
-                      (Thread. (fn [] (.destroy proc))))
-    (with-open [out (reader (.getInputStream proc))
-                err (reader (.getErrorStream proc))]
-      (let [pump-out (doto (Thread. #(pump out *out*)) .start)
-            pump-err (doto (Thread. #(pump err *err*)) .start)]
-        (.join pump-out)
-        (.join pump-err))
-      (.waitFor proc))))
+  (try+
+   (let [proc (.exec (Runtime/getRuntime) (into-array cmd))]
+     (.addShutdownHook (Runtime/getRuntime)
+                       (Thread. (fn [] (.destroy proc))))
+     (with-open [out (reader (.getInputStream proc))
+                 err (reader (.getErrorStream proc))]
+       (let [pump-out (doto (Thread. #(pump out *out*)) .start)
+             pump-err (doto (Thread. #(pump err *err*)) .start)]
+         (.join pump-out)
+         (.join pump-err))
+       (.waitFor proc)))
+   (catch Exception e
+     (command-execution-failed cmd (.getMessage e)))))
 
 (defn- create-layout
   "Creates the layout that will be used for log messages."
@@ -167,34 +171,38 @@
   [drop-date]
   (str qa-drop-base "/" drop-date "/" build-artifact-name))
 
-(defn- required-option-error
-  "Throws an exception indicating that required arguments are missing."
-  [& opt-names]
-  (throw+ {:type ::required-options-missing
-           :opt-names opt-names}))
-
 (defn- build-artifact-url
   "Builds and returns the URL used to obtain the build artifact."
   [{:keys [qa-drop filename job]}]
   (cond (not (string/blank? qa-drop))  (qa-drop-build-artifact-url qa-drop)
         (not (string/blank? job))      (jenkins-build-artifact-url job)
-        :else                          (required-option-error :job :qa-drop)))
+        :else                          (options-missing :job :qa-drop :file)))
+
+(defn- get-remote-resource
+  "Gets a remote resource using a URL."
+  [resource-url]
+  (client/get resource-url {:as               :stream
+                            :throw-exceptions false}))
 
 (defn- get-build-artifact-from-url
   "Gets the build artifact from a URL."
   [dir opts]
-  (let [{:keys [status body]} (client/get (build-artifact-url opts)
-                                          {:as :stream})]
+  (let [artifact-url          (build-artifact-url opts)
+        {:keys [status body]} (get-remote-resource artifact-url)]
     (if-not (< 199 status 300)
-      (throw+ {:type ::build-artifact-retrieval-failed}))
+      (build-artifact-retrieval-failed status artifact-url))
     (with-open [in body]
       (copy in (file dir build-artifact-name)))))
 
 (defn get-build-artifact-from-file
   "Gets the build artifact from a local file."
   [dir filename]
-  (let [f (file filename)]
-    (copy f (file (file dir (.getName f))))))
+  (let [src (file filename)
+        dst (file dir (.getName src))]
+    (try+
+     (copy src dst)
+     (catch IOException e
+       (database-tarball-copy-failed src dst (.getMessage e))))))
 
 (defn- get-build-artifact
   "Obtains the database build artifact."
@@ -212,7 +220,7 @@
   (let [file-path   (.getPath (file dir build-artifact-name))
         exit-status (sh "tar" "xvf" file-path "-C" (.getPath dir))]
     (when-not (zero? exit-status)
-      (throw+ {:type ::build-artifact-expansion-failed}))))
+      (build-artifact-expansion-failed))))
 
 (defn- rec-delete
   "Recursively deletes all files in a directory structure rooted at the given
@@ -243,10 +251,7 @@
         temp-dir-file (fn [idx] (file parent (str base idx)))
         temp-dir      (mk-temp-dir temp-dir-file)]
     (when (nil? temp-dir)
-      (throw+ {:type   ::temp-directory-creation-failure
-               :parent (.getPath parent)
-               :prefix prefix
-               :base   base}))
+      (temp-directory-creation-failure (.getPath parent)  prefix base))
     (log/debug "created temporary directory:" (.getPath temp-dir))
     temp-dir))
 
@@ -356,6 +361,14 @@
        (log-next-exception e)
        (throw+)))))
 
+(defn- exec-mode-fn
+  "Executes the function associated with the selected mode of operation."
+  [opts]
+  (let [mode-fn (modes (keyword (:mode opts)))]
+    (if-not (nil? mode-fn)
+      (mode-fn opts)
+      (unknown-mode (:mode opts)))))
+
 (defn -main
   "Parses the command-line options and performs the database updates."
   [& args-vec]
@@ -363,11 +376,8 @@
     (when (:help opts)
       (println banner)
       (System/exit 0))
-    (cond)
     (configure-logging opts)
     (log/debug opts)
-    (define-db opts)
-    (let [mode-fn (modes (keyword (:mode opts)))]
-      (if-not (nil? mode-fn)
-        (mode-fn opts)
-        (throw+ {:type ::unknown-mode :mode (:mode opts)})))))
+    (trap banner
+     (define-db opts)
+     (exec-mode-fn opts))))
