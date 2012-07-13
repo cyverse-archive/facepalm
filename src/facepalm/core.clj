@@ -17,6 +17,7 @@
             [facepalm.c140-2012053001 :as c140-2012053001]
             [facepalm.c140-2012061501 :as c140-2012061501]
             [facepalm.c140-2012061801 :as c140-2012061801]
+            [facepalm.c140-2012071301 :as c140-2012071301]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File IOException]
            [java.sql SQLException]
@@ -64,7 +65,8 @@
   {"1.4.0:20120525.01" c140-2012052501/convert
    "1.4.0:20120530.01" c140-2012053001/convert
    "1.4.0:20120615.01" c140-2012061501/convert
-   "1.4.0:20120618.01" c140-2012061801/convert})
+   "1.4.0:20120618.01" c140-2012061801/convert
+   "1.4.0:20120713.01" c140-2012071301/convert})
 
 (defn- parse-args
   "Parses the command-line arguments."
