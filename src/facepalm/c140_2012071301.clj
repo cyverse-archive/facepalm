@@ -17,8 +17,8 @@
         id bigint DEFAULT nextval('data_source_id_seq'),
         uuid char(36) NOT NULL,
         name varchar(50) UNIQUE NOT NULL,
+        label varchar(50) NOT NULL,
         description varchar(255) NOT NULL,
-        display varchar(50) NOT NULL,
         PRIMARY KEY(id)
     )"))
 
@@ -42,16 +42,16 @@
   (insert data_source
           (values [{:uuid        "8D6B8247-F1E7-49DB-9FFE-13EAD7C1AED6"
                     :name        "file"
-                    :description "A regular file."
-                    :display     "File"}
+                    :label       "File"
+                    :description "A regular file."}
                    {:uuid        "1EEECF26-367A-4038-8D19-93EA80741DF2"
                     :name        "stdout"
-                    :description "Redirected standard output from a job."
-                    :display     "Standard Output"}
+                    :label       "Standard Output"
+                    :description "Redirected standard output from a job."}
                    {:uuid        "BC4CF23F-18B9-4466-AF54-9D40F0E2F6B5"
                     :name        "stderr"
-                    :description "Redirected error output from a job."
-                    :display     "Standard Error Output"}])))
+                    :label       "Standard Error Output"
+                    :description "Redirected error output from a job."}])))
 
 (defn- get-data-source-id
   "Gets the internal data source identifier for the given UUID."
