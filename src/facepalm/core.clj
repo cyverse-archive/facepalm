@@ -18,6 +18,7 @@
             [facepalm.c140-2012061501 :as c140-2012061501]
             [facepalm.c140-2012061801 :as c140-2012061801]
             [facepalm.c140-2012071301 :as c140-2012071301]
+            [facepalm.c140-2012072001 :as c140-2012072001]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File IOException]
            [java.sql SQLException]
@@ -66,7 +67,8 @@
    "1.4.0:20120530.01" c140-2012053001/convert
    "1.4.0:20120615.01" c140-2012061501/convert
    "1.4.0:20120618.01" c140-2012061801/convert
-   "1.4.0:20120713.01" c140-2012071301/convert})
+   "1.4.0:20120713.01" c140-2012071301/convert
+   "1.4.0:20120720.01" c140-2012072001/convert})
 
 (defn- parse-args
   "Parses the command-line arguments."
@@ -322,7 +324,7 @@
   [dir opts]
   (try+
     (refresh-public-schema (:user opts))
-    (dorun (map #(load-sql-files dir %) ["tables" "views" "data"]))
+    (dorun (map #(load-sql-files dir %) ["tables" "views" "data" "functions"]))
     (catch Exception e
       (log-next-exception e)
       (throw+))))
