@@ -2,6 +2,7 @@
   (:gen-class)
   (:use [clojure.java.io :only [copy file reader]]
         [clojure.tools.cli :only [cli]]
+        [clojure-commons.file-utils :only [with-temp-dir]]
         [facepalm.error-codes]
         [kameleon.core]
         [kameleon.entities]
@@ -49,10 +50,6 @@
 (def ^:private build-artifact-name
   "The name of the build artifact to retrieve."
   "database.tar.gz")
-
-(def ^:private max-temp-dir-attempts
-  "The maximum number of times to attempt to create a temporary directory."
-  10)
 
 (def ^:private modes
   "The map of mode names to their helper functions."
@@ -237,51 +234,6 @@
     (when-not (zero? exit-status)
       (build-artifact-expansion-failed))))
 
-(defn- rec-delete
-  "Recursively deletes all files in a directory structure rooted at the given
-   directory.  Note that this recursion does consume stack space.  This
-   shouldn't be a problem, however, because a directory structure that is deep
-   enough to cause a stack overflow will probably create a path that is too
-   long for the OS to support."
-  [f]
-  (when (.isDirectory f)
-    (dorun (map #(rec-delete %) (.listFiles f))))
-  (log/debug "deleting" (.getPath f))
-  (.delete f))
-
-(defn- mk-temp-dir
-  "Attempts to create a temporary directory named by the provided function."
-  [name-fn]
-  (loop [idx 0]
-    (if-not (>= idx max-temp-dir-attempts)
-      (let [f (name-fn idx)]
-        (log/debug "attempting to create temporary directory" (.getPath f))
-        (if (.mkdir f) f (recur (inc idx))))
-      nil)))
-
-(defn- temp-dir
-  "Creates a temporary directory."
-  [prefix parent]
-  (let [base          (str prefix (System/currentTimeMillis) "-")
-        temp-dir-file (fn [idx] (file parent (str base idx)))
-        temp-dir      (mk-temp-dir temp-dir-file)]
-    (when (nil? temp-dir)
-      (temp-directory-creation-failure (.getPath parent)  prefix base))
-    (log/debug "created temporary directory:" (.getPath temp-dir))
-    temp-dir))
-
-(defmacro ^:private with-temp-dir
-  "Creates and switches the current working directory to a temporary directory.
-   The body is executed in a try expression with a finally clause that
-   recursively deletes the directory."
-  [sym & body]
-  `(let [~sym (temp-dir "-fp-" (file (System/getProperty "user.dir")))]
-     (try
-       (.delete ~sym)
-       (.mkdir ~sym)
-       ~@body
-       (finally (rec-delete ~sym)))))
-
 (defn exec-sql-statement
   "A wrapper around korma.core/exec-raw that logs the statement that is being
    executed if debugging is enabled."
@@ -335,7 +287,7 @@
   "Initializes the database using a database archive obtained from a well-known
    location."
   [opts]
-  (with-temp-dir dir
+  (with-temp-dir dir "-fp-" temp-directory-creation-failure
     (get-build-artifact dir opts)
     (unpack-build-artifact dir)
     (transaction (apply-database-init-scripts dir opts))))
