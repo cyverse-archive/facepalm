@@ -262,7 +262,7 @@
        (select))))
 
 (defn convert
-  "Performs the conversions for database version 1.40:20120726.01."
+  "Performs the conversions for database version 1.4.0:20120726.01."
   []
   (println "Performing conversion for" version)
   (drop-component-listing-views)
