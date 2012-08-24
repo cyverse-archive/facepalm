@@ -105,6 +105,13 @@
   (throw+ {:type ::unknown-mode
            :mode mode}))
 
+(defn conversion-validation-error
+  "Throws an exception indicating that the validation for a conversion step
+   failed."
+  [db-version m]
+  (throw+ (merge m {:type       ::conversion-validation-error
+                    :db-version db-version})))
+
 (defn error-exit
   "Prints a message to standard error output and exits with a non-zero exit
    status."

@@ -136,7 +136,7 @@
 (defn populate-genome-reference-table
   "Populates the genome-reference table with genomic metadata."
   []
-  (println "\t* repopulating genome_references with updated data.")
+  (println "\t* repopulating genome_references with updated data")
   (exec-raw "TRUNCATE genome_reference;")
   (let [public-user-id (get-public-user-id)
         field-names    [:uuid :name :path :created_by]]

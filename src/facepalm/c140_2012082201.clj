@@ -3,13 +3,14 @@
         [kameleon.core]
         [kameleon.entities
          :only [data_object property property_group validator template
-                transformation_activity]])
+                transformation_activity]]
+        [facepalm.error-codes :only [conversion-validation-error]])
   (:require [clojure.string :as string])
   (:import [java.util UUID]))
 
 (def ^:private version
   "The destination database version."
-  "1.4.0:20120726.01")
+  "1.4.0:20120822.01")
 
 ;; An entity that can be used to find duplicated validator IDs.
 (defentity validator_count
@@ -147,9 +148,9 @@
    property IDs in the associated template."
   [prop-maps {tx-id :id template-id :template_id}]
   (let [id-map (prop-maps template-id)]
-    (->> (select :transformation_values (where {:transformation_id tx-id}))
-         (map update-transformation-value-property-id id-map)
-         dorun)))
+    (dorun (map #(update-transformation-value-property-id id-map %)
+                (select :transformation_values
+                       (where {:transformation_id tx-id}))))))
 
 (defn- update-step-configs-for-app
   "Updates the step configurations (that is, the property values specified in
@@ -185,22 +186,21 @@
 (defn- fix-dataobject-mapping
   "Fixes a dataobject mapping for a multistep app."
   [source-id-map target-id-map {:keys [mapping_id input output]}]
-  (when (or (contains? source-id-map input) (contains? target-id-map output))
+  (when (or (contains? source-id-map output) (contains? target-id-map input))
     (update :dataobject_mapping
-            (set-fields {:input  (or (source-id-map input) input)
-                         :output (or (target-id-map output) output)})
+            (set-fields {:input  (or (target-id-map input) input)
+                         :output (or (source-id-map output) output)})
             (where {:mapping_id mapping_id
                     :input      input
                     :output     output}))))
 
 (defn- fix-io-mapping
   "Fixes an input/output mapping for an app."
-  [prop-maps {:keys [id source target]}]
+  [prop-maps {:keys [hid source target]}]
   (let [source-id-map (prop-maps (template-id-for-step source))
         target-id-map (prop-maps (template-id-for-step target))]
-    (->> (select :dataobject_mapping (where {:mapping_id id}))
-         (map #(fix-dataobject-mapping source-id-map target-id-map))
-         dorun)))
+    (dorun (map #(fix-dataobject-mapping source-id-map target-id-map %)
+                (select :dataobject_mapping (where {:mapping_id hid}))))))
 
 (defn- update-dataobject-mappings-for-app
   "Updates the input/output mappings for a multistep app."
@@ -217,12 +217,81 @@
 (defn- fix-duplicated-property-ids
   "Removes duplicated property identifiers from the database."
   []
-  (println "\t* eliminating duplicate property IDs; this could take a while.")
+  (println "\t* eliminating duplicate property IDs; this could take a while")
   (let [template-ids (map :id (select template (fields :id)))
         prop-maps    (into {} (map #(vector % (update-property-ids-for %))
                                    template-ids))
         app-ids      (map :id (select transformation_activity (fields :id)))]
     (dorun (map #(update-app-property-references prop-maps %) app-ids))))
+
+(defn- prop-ids-for-template
+  "Obtains the set of property identifiers associated with a template."
+  [template-id]
+  (set (map :id (load-props-for-template template-id))))
+
+(defn- validate-transformation-value
+  "Verifies that a single transformation value appears to be correct after the
+   conversion."
+  [{property-id :property template-id :template_id}]
+  (let [prop-ids (prop-ids-for-template template-id)]
+    (when-not (contains? prop-ids property-id)
+      (conversion-validation-error
+       version {:error-code  :invalid-property-id-in-transformation-value
+                :property-id property-id
+                :template-id template-id}))))
+
+(defn- validate-step-configs
+  "Verifies that the step configurations appear to be correct after the
+   conversion."
+  []
+  (println "\t* validating the updated transformation configurations")
+  (dorun (map validate-transformation-value
+              (select :transformation_values
+                      (fields :transformation_values.property
+                              :transformations.template_id)
+                      (join :transformations
+                            (= :transformation_values.transformation_id
+                               :transformations.id))))))
+
+(defn- validate-dataobject-mapping
+  "Validates a single data object mapping."
+  [source-props target-props {:keys [mapping_id input output]}]
+  (if-not (and (contains? target-props input) (contains? source-props output))
+    (conversion-validation-error
+     version {:error-code :invalid-property-id-in-io-mapping
+              :mapping-id mapping_id
+              :input-id   input
+              :output-id  output})))
+
+(defn- mapping-belongs-to-deleted-app
+  "Determines whether or not an input/output mapping belongs to a deleted app."
+  [mapping-id]
+  ((comp :deleted first)
+   (select
+    :transformation_activity_mappings
+    (fields :transformation_activity.deleted)
+    (join :transformation_activity
+          (= :transformation_activity.hid
+             :transformation_activity_mappings.transformation_activity_id))
+    (where {:transformation_activity_mappings.mapping_id mapping-id}))))
+
+(defn- validate-io-mapping
+  "Verifies a single input/output mapping after the conversion.  The mappings
+   for some deleted apps were already broken, so this validation is only
+   performed for apps that are not marked as deleted."
+  [{:keys [hid source target]}]
+  (when-not (mapping-belongs-to-deleted-app hid)
+    (let [source-props (prop-ids-for-template (template-id-for-step source))
+          target-props (prop-ids-for-template (template-id-for-step target))]
+      (dorun (map #(validate-dataobject-mapping source-props target-props %)
+                  (select :dataobject_mapping (where {:mapping_id hid})))))))
+
+(defn- validate-io-mappings
+  "Verifies that the input/output mappings appear to be correct after the
+   conversion."
+  []
+  (println "\t* validating the updated input/output mappings")
+  (dorun (map validate-io-mapping (select :input_output_mapping))))
 
 (defn convert
  "Performs the conversions for database version 1.4.0:20120822.01."
@@ -230,4 +299,6 @@
  (println "Performing conversion for" version)
  (fix-duplicated-validator-ids)
  (fix-duplicated-property-group-ids)
- (fix-duplicated-property-ids))
+ (fix-duplicated-property-ids)
+ (validate-step-configs)
+ (validate-io-mappings))
