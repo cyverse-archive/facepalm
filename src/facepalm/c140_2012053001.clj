@@ -139,11 +139,11 @@
   (println "\t* repopulating genome_references with updated data.")
   (exec-raw "TRUNCATE genome_reference;")
   (let [public-user-id (get-public-user-id)
-        values-maps    (->> genome-reference-values
-                            (map #(conj % public-user-id))
-                            (map #(zipmap [:uuid :name :path :created_by] %)))]
+        field-names    [:uuid :name :path :created_by]]
     (insert genome_reference
-            (values values-maps))))
+            (values (->> genome-reference-values
+                         (map #(conj % public-user-id))
+                         (map #(zipmap field-names %)))))))
 
 (defn convert
   "Performs the conversion for database version 1.4.0:20120530.01."
