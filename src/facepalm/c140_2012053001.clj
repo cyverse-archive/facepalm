@@ -23,7 +23,7 @@
         created_by bigint references users(id),
         created_on timestamp DEFAULT now() NOT NULL,
         last_modified_by bigint references users(id),
-        last_modified_on timestamp,
+        last_modified_on timestamp DEFAULT now() NOT NULL,
         PRIMARY KEY(id)
     )"))
 
@@ -139,10 +139,10 @@
   (println "\t* repopulating genome_references with updated data")
   (exec-raw "TRUNCATE genome_reference;")
   (let [public-user-id (get-public-user-id)
-        field-names    [:uuid :name :path :created_by]]
+        field-names    [:uuid :name :path :created_by :last_modified_by]]
     (insert genome_reference
             (values (->> genome-reference-values
-                         (map #(conj % public-user-id))
+                         (map #(conj % public-user-id public-user-id))
                          (map #(zipmap field-names %)))))))
 
 (defn convert
