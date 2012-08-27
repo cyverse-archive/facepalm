@@ -71,6 +71,11 @@
    "1.4.0:20120726.01" c140-2012072601/convert
    "1.4.0:20120822.01" c140-2012082201/convert})
 
+(defn- to-int
+  "Parses a string representation of an integer."
+  [i]
+  (Integer. i))
+
 (defn- parse-args
   "Parses the command-line arguments."
   [args]
@@ -80,7 +85,7 @@
         :default "init"]
        ["-h" "--host" "The database hostname." :default "localhost"]
        ["-p" "--port" "The database port number." :default 5432
-        :parse-fn #(Integer. %)]
+        :parse-fn to-int]
        ["-d" "--database" "The database name." :default "de"]
        ["-U" "--user" "The database username." :default "de"]
        ["-j" "--job" "The name of DE database job in Jenkins."
@@ -140,6 +145,13 @@
      (.setName "Console")
      (.setThreshold (if (:debug opts) Level/DEBUG Level/ERROR)))))
 
+(defn- prompt-for-password
+  "Prompts the user for a password."
+  []
+  (print "Password: ")
+  (flush)
+  (.. System console readPassword))
+
 (defn- get-password
   "Attempts to obtain the database password from the user's .pgpass file.  If
    the password can't be obtained from .pgpass, prompts the user for the
@@ -147,10 +159,9 @@
   [host port database user]
   (let [password (pgpass/get-password host port database user)]
     (if (nil? password)
-      (do
-        (print "Password: ")
-        (flush)
-        (apply str (.. System console readPassword)))
+      (if (nil? (System/console))
+        (no-password-supplied host port database user)
+        (prompt-for-password))
       password)))
 
 (defn- define-db

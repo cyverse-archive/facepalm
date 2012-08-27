@@ -112,6 +112,16 @@
   (throw+ (merge m {:type       ::conversion-validation-error
                     :db-version db-version})))
 
+(defn no-password-supplied
+  "Throws an exception indicating that a password was not found in .pgpass and
+   no password was supplied at the password prompt."
+  [host port database user]
+  (throw+ {:type     ::no-password-supplied
+           :host     host
+           :port     port
+           :database database
+           :user     user}))
+
 (defn error-exit
   "Prints a message to standard error output and exits with a non-zero exit
    status."
