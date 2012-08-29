@@ -116,10 +116,17 @@
 (defn- update-property-ids-for
   "Updates the property identifiers in a template."
   [template-id]
-  (->> (load-props-for-template template-id)
-       (filter (fn [{:keys [id]}] (> (count-props id) 1)))
-       (map #(vector (:id %) (update-property-id %)))
-       (into {})))
+  (letfn [(uuid? [id]
+            (or (re-matches #"[0-9A-F]{8}-(?:[0-9A-F]{4}-){3}[0-9A-F]{12}" id)
+                (re-matches #"p[0-9a-f]{32}" id)))
+          (should-replace-id? [{:keys [id]}]
+            (cond (> (count-props id) 1) true
+                  (uuid? id)             false
+                  :else                  true))]
+    (->> (load-props-for-template template-id)
+        (filter should-replace-id?)
+        (map #(vector (:id %) (update-property-id %)))
+        (into {}))))
 
 (defn- load-transformations-for-app
   "Loads the transformations associated with an app from the database."
