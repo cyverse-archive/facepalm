@@ -102,15 +102,10 @@
   "Updates the identifier for a single property.  If there's an associated
    data object then the data object's property should have the same ID."
   [{:keys [hid]}]
-  (let [new-id (uuid)
-        prop   (update property
-                       (set-fields {:id new-id})
-                       (where {:hid hid}))
-        do-id  (:dataobject_id prop)]
-    (when-not (nil? do-id)
-      (update data_object
-              (set-fields {:id new-id})
-              (where {:hid do-id})))
+  (let [new-id (uuid)]
+    (update property
+            (set-fields {:id new-id})
+            (where {:hid hid}))
     new-id))
 
 (defn- update-property-ids-for
@@ -231,6 +226,16 @@
         app-ids      (map :id (select transformation_activity (fields :id)))]
     (dorun (map #(update-app-property-references prop-maps %) app-ids))))
 
+(defn- fix-dataobject-ids
+  "Fixes any data object IDs that were broken by the conversion."
+  []
+  (println "\t* fixing any data object IDs that were broken by the conversion")
+  (exec-raw
+   "UPDATE dataobjects
+    SET id = p.id
+    FROM property p
+    WHERE p.dataobject_id = dataobjects.hid"))
+
 (defn- prop-ids-for-template
   "Obtains the set of property identifiers associated with a template."
   [template-id]
@@ -300,6 +305,26 @@
   (println "\t* validating the updated input/output mappings")
   (dorun (map validate-io-mapping (select :input_output_mapping))))
 
+(defn- count-invalid-dataobject-ids
+  "Counts the number of data objects for which the ID is not the same as the ID
+   of the parent property."
+  []
+  (-> (select property
+              (aggregate (count :*) :count)
+              (join data_object)
+              (where {:property.id [not= :data_object.id]}))
+      first
+      :count))
+
+(defn- validate-dataobject-ids
+  "Verifies that the ID of each data object is the same as the ID of its parent
+   property."
+  []
+  (println "\t* verifying data object IDs")
+  (when-not (zero? (count-invalid-dataobject-ids))
+    (conversion-validation-error
+     version {:error-code :invalid-dataobject-ids-found})))
+
 (defn convert
  "Performs the conversions for database version 1.4.0:20120822.01."
  []
@@ -307,5 +332,7 @@
  (fix-duplicated-validator-ids)
  (fix-duplicated-property-group-ids)
  (fix-duplicated-property-ids)
+ (fix-dataobject-ids)
  (validate-step-configs)
- (validate-io-mappings))
+ (validate-io-mappings)
+ (validate-dataobject-ids))
