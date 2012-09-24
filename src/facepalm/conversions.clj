@@ -6,9 +6,9 @@
   [fname]
   (first (string/split fname #"\.")))
 
-(defn split-on-dash
+(defn split-on-underscore
   [fname]
-  (string/split fname #"\-"))
+  (string/split fname #"_"))
 
 (defn dotize
   [vstr]
@@ -39,8 +39,45 @@
   [fname]
   (-> fname
       drop-extension
-      split-on-dash
+      split-on-underscore
       fmt-version
       fmt-date
       db-version))
+
+(defn fname->ns-str
+  [fname]
+  (-> (str "facepalm." fname)
+      (string/replace #"\.clj$" "")
+      (string/replace #"_" "-")))
+
+(defn ns-str->cv-str
+  [ns-str]
+  (str ns-str "/convert"))
+
+(defn fname->cv-ref
+  [fname]
+  (-> fname
+      fu/basename
+      fname->ns-str
+      ns-str->cv-str
+      symbol))
+
+(defn list-conversions
+  [dir]
+  (filter
+   #(re-seq #"^c.*_[0-9]{10}\.clj$" (fu/basename %1))
+   (map
+    str
+    (.listFiles (clojure.java.io/file (fu/path-join dir "conversions"))))))
+
+(defn load-conversions
+  [cv-list]
+  (doseq [cv cv-list]
+    (load-file cv)))
+
+(defn conversion-map
+  [dir]
+  (map
+   #(assoc {} (fname->db-version (fu/basename %1)) (fname->cv-ref %1))
+   (list-conversions dir)))
 
