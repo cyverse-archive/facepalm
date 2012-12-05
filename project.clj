@@ -17,7 +17,7 @@
                  [slingshot "0.10.2"]
                  [clj-http "0.4.1"]]
   :plugins [[org.iplantc/lein-iplant-cmdtar "0.1.0-SNAPSHOT"]
-            [org.iplantc/lein-iplant-rpm "1.3.0-SNAPSHOT"]
+            [org.iplantc/lein-iplant-rpm "1.4.0-SNAPSHOT"]
             [lein-marginalia "0.7.0"]]
   :iplant-rpm {:summary "Facepalm"
                :type :command}
