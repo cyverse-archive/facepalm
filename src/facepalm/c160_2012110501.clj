@@ -22,5 +22,5 @@
 (defn convert
   "Performs the conversions for database version 1.6.0:20121105.01."
   []
-  (println "Performing conversion for" version)
+  (println "Performing the conversion for" version)
   (rename-app-groups))
