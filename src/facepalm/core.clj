@@ -25,6 +25,7 @@
             [facepalm.c144-2012092701 :as c144-2012092701]
             [facepalm.c160-2012110501 :as c160-2012110501]
             [facepalm.c160-2012120401 :as c160-2012120401]
+            [facepalm.c160-2012121301 :as c160-2012121301]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File IOException]
            [java.sql SQLException]
@@ -75,7 +76,8 @@
    "1.4.0:20120822.01" c140-2012082201/convert
    "1.4.4:20120927.01" c144-2012092701/convert
    "1.6.0:20121105.01" c160-2012110501/convert
-   "1.6.0:20121204.01" c160-2012120401/convert})
+   "1.6.0:20121204.01" c160-2012120401/convert
+   "1.6.0:20121213.01" c160-2012121301/convert})
 
 (defn- to-int
   "Parses a string representation of an integer."
