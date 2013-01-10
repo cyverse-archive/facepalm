@@ -15,7 +15,7 @@ facepalm -h hostname -U username -d database -q 2012-06-15
 facepalm -h hostname -U username -d database -f /path/to/database.tar.gz
 
 # Obtain the database tarball from the latest build of a Jenkins job.
-facepalm -h hostname -U username -d database -j jobname
+facepalm -h hostname -U username -d database -j jobname -f database.tar.gz
 
 # Upgrade the database from the existing version.
 facepalm -m update -h hostname -U username -d database
@@ -84,60 +84,44 @@ this, there will be at most one password prompt per facepalm invocation.
 
 ### -j --job
 
-Default Value: `database`
-
 This argument indicates the name of a Jenkins job from which the database
 initialization scripts can be obtained.  At the time of this writing, valid
-job names are `database` and `database-dev`.
+job names are `database` and `database-dev`.  This option is used in conjunction
+with the `-f` or `--filename` option to specify the name of the Jenkins job
+along with the name of the build artifact produced by the job.  If the file name
+is not specified explicitly then facepalm assumes that it is `database.tar.gz`.
 
-This argument is actually one of three mutually exclusive command-line
-arguments that can be used to indicate where facepalm should obtain its
-database initialization files.  The other two options are `-q`, which is
-equivalent to `--qa-drop`, and `-f`, which is equivalent to `--filename`.
-Note that at least one of these three command-line options must have a value
-if facepalm is executed in `init` mode.  If none of these three command-line
-options is specified in `init` mode then facepalm will default to using the
-`-j` option with the default value of `database`, meaning that facepalm will
-obtain the database initialization files from the build artifact for the
-latest `database` project build in iPlant's Jenkins deployment.
+This argument is one of three command-line arguments that can be used to
+indicate where facepalm should obtain its database initialization files.  The
+other two options are `-q`, which is equivalent to `--qa-drop`, and `-f`, which
+is equivalent to `--filename`.
 
 ### -q --qa-drop
 
 This argument indicates the QA drop from which the database initialization
 scripts should be obtained.  This can either be the date of the QA drop in
 `YYYY-MM-DD` format (for example, `2012-06-12`) or the literal string `latest`
-to indicate that facepalm should obtain the database initialization scripts
-from the most recent QA drop.
+to indicate that facepalm should obtain the database initialization scripts from
+the most recent QA drop.  This option is used in conjunction with the `-f` or
+`--filename` option to specify the location of the QA drop along with the name
+of the file containing the database initialization scripts.  If the file name is
+not specified explicitly then facepalm assumes that it is `database.tar.gz`.
 
-This argument is actually one of three mutually exclusive command-line
-arguments that can be used to indicate where facepalm should obtain its
-database initialization files.  The other two options are `-J`, which is
-equivalent to `--job`, and `-f`, which is equivalent to `--filename`.  Note
-that at least one of these three command-line options must have a value if
-facepalm is executed in `init` mode.  If none of these three command-line
-options is specified in `init` mode then facepalm will default to using the
-`-j` option with the default value of `database`, meaning that facepalm will
-obtain the database initialization files from the build artifact for the
-latest `database` project build in iPlant's Jenkins deployment.
+This argument is one of three command-line arguments that can be used to
+indicate where facepalm should obtain its database initialization files.  The
+other two options are `-j`, which is equivalent to `--job`, and `-f`, which is
+equivalent to `--filename`.
 
 ### -f --filename
 
-This argument indicates that facepalm should obtain the database
-initialization scripts from a tarball on the local file system.  This option
-is most commonly used during development testing so that updates to the
-database initialization scripts may be tested without having to push the
-script changes into the git repository first.
+Default Value: `database.tar.gz`
 
-This argument is actually one of three mutually exclusive command-line
-arguments that can be used to indicate where facepalm should obtain its
-database initialization files.  The other two options are `-j`, which is
-equivalent to `--job`, and `-q`, which is equivalent to `--qa-drop`.  Note
-that at least one of these three command-line options must have a value if
-facepalm is executed in `init` mode.  If none of these three command-line
-options is specified in `init` mode then facepalm will default to using the
-`-j` option with the default value of `database`, meaning that facepalm will
-obtain the database initialization files from the build artifact for the
-latest `database` project build in iPlant's Jenkins deployment.
+This argument is used to specify the name of the tarball containing the database
+initialization scripts.  If this argument is used by itself (that is, without
+the `-j` or `-q` options) then facepalm will treat its value as the path to a
+tarball on the local file system.  If this argument is used in conjunction with
+the `-j` or `-q` options then facepalm will treat its value as the name of the
+tarball containing the database initialization scripts on the remote server.
 
 ### -? --help --no-help
 

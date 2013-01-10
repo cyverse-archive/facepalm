@@ -52,10 +52,6 @@
   "The base URL for the QA drops."
   "http://projects.iplantcollaborative.org/qa-drops")
 
-(def ^:private build-artifact-name
-  "The name of the build artifact to retrieve."
-  "database.tar.gz")
-
 (def ^:private modes
   "The map of mode names to their helper functions."
   {:init   do-init
@@ -96,10 +92,10 @@
         :parse-fn to-int]
        ["-d" "--database" "The database name." :default "de"]
        ["-U" "--user" "The database username." :default "de"]
-       ["-j" "--job" "The name of DE database job in Jenkins."
-        :default "database"]
+       ["-j" "--job" "The name of DE database job in Jenkins."]
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
-       ["-f" "--filename" "An explicit path to the database tarball."]
+       ["-f" "--filename" "An explicit path to the database tarball."
+        :default "database.tar.gz"]
        ["--debug" "Enable debugging." :default false :flag true]))
 
 (defn- pump
@@ -192,24 +188,21 @@
      (database-connection-failure host port database user))))
 
 (defn- jenkins-build-artifact-url
-  "Returns the URL used to obtain the build artifact from Jenkins.  We assume
-   that the name of the artifiact is database.tar.gz."
-  [job-name]
-  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
-       build-artifact-name))
+  "Returns the URL used to obtain the build artifact from Jenkins."
+  [job-name filename]
+  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/" filename))
 
 (defn- qa-drop-build-artifact-url
-  "Returns the URL used to obtain the build artifact from a QA drop.  We assume
-   that the name of the artifact is database.tar.gz."
-  [drop-date]
-  (str qa-drop-base "/" drop-date "/" build-artifact-name))
+  "Returns the URL used to obtain the build artifact from a QA drop."
+  [drop-date filename]
+  (str qa-drop-base "/" drop-date "/" filename))
 
 (defn- build-artifact-url
   "Builds and returns the URL used to obtain the build artifact."
   [{:keys [qa-drop filename job]}]
-  (cond (not (string/blank? qa-drop))  (qa-drop-build-artifact-url qa-drop)
-        (not (string/blank? job))      (jenkins-build-artifact-url job)
-        :else                          (options-missing :job :qa-drop :file)))
+  (cond (not (string/blank? qa-drop)) (qa-drop-build-artifact-url qa-drop filename)
+        (not (string/blank? job))     (jenkins-build-artifact-url job filename)
+        :else                         (options-missing :job :qa-drop :file)))
 
 (defn- get-remote-resource
   "Gets a remote resource using a URL."
@@ -225,7 +218,7 @@
     (if-not (< 199 status 300)
       (build-artifact-retrieval-failed status artifact-url))
     (with-open [in body]
-      (copy in (file dir build-artifact-name)))))
+      (copy in (file dir (:filename opts))))))
 
 (defn get-build-artifact-from-file
   "Gets the build artifact from a local file."
@@ -237,20 +230,20 @@
      (catch IOException e
        (database-tarball-copy-failed src dst (.getMessage e))))))
 
+
 (defn- get-build-artifact
   "Obtains the database build artifact."
-  [dir opts]
+  [dir {:keys [filename job qa-drop] :as opts}]
   (println "Retrieving the build artifact...")
-  (let [filename (:filename opts)]
-    (if (string/blank? filename)
-      (get-build-artifact-from-url dir opts)
-      (get-build-artifact-from-file dir filename))))
+  (if (every? string/blank? [qa-drop job])
+    (get-build-artifact-from-file dir filename)
+    (get-build-artifact-from-url dir opts)))
 
 (defn- unpack-build-artifact
   "Unpacks the database build artifact after it has been obtained."
-  [dir]
+  [dir filename]
   (println "Unpacking the build artifact...")
-  (let [file-path   (.getPath (file dir build-artifact-name))
+  (let [file-path   (.getPath (file dir (.getName (file filename))))
         exit-status (sh "tar" "xvf" file-path "-C" (.getPath dir))]
     (when-not (zero? exit-status)
       (build-artifact-expansion-failed))))
@@ -310,7 +303,7 @@
   [opts]
   (with-temp-dir dir "-fp-" temp-directory-creation-failure
     (get-build-artifact dir opts)
-    (unpack-build-artifact dir)
+    (unpack-build-artifact dir (:filename opts))
     (transaction (apply-database-init-scripts dir opts))))
 
 (defn- get-current-db-version
