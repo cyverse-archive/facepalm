@@ -57,11 +57,17 @@
 (def conversions (atom nil))
 
 (defn set-conversions
+  "Reads in the conversions from the unpacked build artifact. Set the conversions atom
+   to the conversion map."
   [unpacked-dir]
+  (println "Loading conversions...")
   (let [conversion-dir (file unpacked-dir "conversions")]
     (when-not (.exists conversion-dir)
       (throw+ {:error_code "ERR_DOES_NOT_EXIST" :path (str conversion-dir)}))
-    (reset! conversions (cnv/conversion-map unpacked-dir))))
+    (reset! conversions (cnv/conversion-map unpacked-dir))
+    (println "Done loading conversions.")
+    (println "Here are the loaded conversions: ")
+    (println (keys @conversions))))
 
 (defn- to-int
   "Parses a string representation of an integer."
@@ -84,7 +90,6 @@
         :default "database"]
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
        ["-f" "--filename" "An explicit path to the database tarball."]
-       [""]
        ["--debug" "Enable debugging." :default false :flag true]))
 
 (defn- pump
@@ -165,7 +170,7 @@
                :subprotocol "postgresql"
                :subname (str "//" host ":" port "/" database)
                :user user
-               :password password})))
+               :password (apply str password)})))
 
 (defn- test-db
   "Test the database connection settings to ensure that the connection settings
