@@ -77,7 +77,7 @@
 
 (defn conversion-map
   [dir]
-  (map
-   #(assoc {} (fname->db-version (fu/basename %1)) (fname->cv-ref %1))
-   (list-conversions dir)))
+  (apply merge (map
+                #(assoc {} (fname->db-version (fu/basename %1)) (fname->cv-ref %1))
+                (list-conversions dir))))
 
