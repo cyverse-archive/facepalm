@@ -14,18 +14,7 @@
   (:require [clojure.string :as string]
             [clojure.tools.logging :as log]
             [clj-http.client :as client]
-            [facepalm.c140-2012052501 :as c140-2012052501]
-            [facepalm.c140-2012053001 :as c140-2012053001]
-            [facepalm.c140-2012061501 :as c140-2012061501]
-            [facepalm.c140-2012061801 :as c140-2012061801]
-            [facepalm.c140-2012071301 :as c140-2012071301]
-            [facepalm.c140-2012072001 :as c140-2012072001]
-            [facepalm.c140-2012072601 :as c140-2012072601]
-            [facepalm.c140-2012082201 :as c140-2012082201]
-            [facepalm.c144-2012092701 :as c144-2012092701]
-            [facepalm.c160-2012110501 :as c160-2012110501]
-            [facepalm.c160-2012120401 :as c160-2012120401]
-            [facepalm.c160-2012121301 :as c160-2012121301]
+            [facepalm.conversions :as cnv]
             [kameleon.pgpass :as pgpass])
   (:import [java.io File IOException]
            [java.sql SQLException]
@@ -61,19 +50,20 @@
   "The names of the modes, used in the help string for the --mode option."
   (apply str (string/join " | " (map name (keys modes)))))
 
-(def ^:private conversions
-  {"1.4.0:20120525.01" c140-2012052501/convert
-   "1.4.0:20120530.01" c140-2012053001/convert
-   "1.4.0:20120615.01" c140-2012061501/convert
-   "1.4.0:20120618.01" c140-2012061801/convert
-   "1.4.0:20120713.01" c140-2012071301/convert
-   "1.4.0:20120720.01" c140-2012072001/convert
-   "1.4.0:20120726.01" c140-2012072601/convert
-   "1.4.0:20120822.01" c140-2012082201/convert
-   "1.4.4:20120927.01" c144-2012092701/convert
-   "1.6.0:20121105.01" c160-2012110501/convert
-   "1.6.0:20121204.01" c160-2012120401/convert
-   "1.6.0:20121213.01" c160-2012121301/convert})
+(def conversions (atom nil))
+
+(defn set-conversions
+  "Reads in the conversions from the unpacked build artifact. Set the conversions atom
+   to the conversion map."
+  [unpacked-dir]
+  (println "Loading conversions...")
+  (let [conversion-dir (file unpacked-dir "conversions")]
+    (when-not (.exists conversion-dir)
+      (throw+ {:error_code "ERR_DOES_NOT_EXIST" :path (str conversion-dir)}))
+    (reset! conversions (cnv/conversion-map unpacked-dir))
+    (println "Done loading conversions.")
+    (println "Here are the loaded conversions: ")
+    (println (keys @conversions))))
 
 (defn- to-int
   "Parses a string representation of an integer."
@@ -176,7 +166,7 @@
                :subprotocol "postgresql"
                :subname (str "//" host ":" port "/" database)
                :user user
-               :password password})))
+               :password (apply str password)})))
 
 (defn- test-db
   "Test the database connection settings to ensure that the connection settings
@@ -304,6 +294,7 @@
   (with-temp-dir dir "-fp-" temp-directory-creation-failure
     (get-build-artifact dir opts)
     (unpack-build-artifact dir (:filename opts))
+    (set-conversions dir)
     (transaction (apply-database-init-scripts dir opts))))
 
 (defn- get-current-db-version
@@ -319,13 +310,13 @@
   "Gets the list of versions to run database conversions for."
   [current-version]
   (drop-while #(<= (compare % current-version) 0)
-              (sort (keys conversions))))
+              (sort (keys @conversions))))
 
 (defn- do-conversion
   "Performs a databae conversion and updates the database version."
   [new-version]
   (transaction
-   ((conversions new-version))
+   ((@conversions new-version))
    (insert version
            (values {:version new-version}))))
 
