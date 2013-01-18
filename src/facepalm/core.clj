@@ -56,14 +56,13 @@
   "Reads in the conversions from the unpacked build artifact. Set the conversions atom
    to the conversion map."
   [unpacked-dir]
-  (println "Loading conversions...")
   (let [conversion-dir (file unpacked-dir "conversions")]
-    (when-not (.exists conversion-dir)
-      (throw+ {:error_code "ERR_DOES_NOT_EXIST" :path (str conversion-dir)}))
-    (reset! conversions (cnv/conversion-map unpacked-dir))
-    (println "Done loading conversions.")
-    (println "Here are the loaded conversions: ")
-    (println (keys @conversions))))
+    (when (.exists conversion-dir)
+      (println "Loading conversions...")
+      (reset! conversions (cnv/conversion-map unpacked-dir))
+      (println "Done loading conversions.")
+      (println "Here are the loaded conversions: ")
+      (println (keys @conversions)))))
 
 (defn- to-int
   "Parses a string representation of an integer."
