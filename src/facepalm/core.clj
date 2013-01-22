@@ -62,7 +62,7 @@
       (reset! conversions (cnv/conversion-map unpacked-dir))
       (println "Done loading conversions.")
       (println "Here are the loaded conversions: ")
-      (println (keys @conversions)))))
+      (dorun (map (partial println "   ") (keys @conversions))))))
 
 (defn- to-int
   "Parses a string representation of an integer."
@@ -311,6 +311,15 @@
   (drop-while #(<= (compare % current-version) 0)
               (sort (keys @conversions))))
 
+(defn- validate-update-versions
+  "Validates the list of versions to run database conversions for.  An
+   exception will be thrown if any are not compatible with the current version
+   of kameleon."
+  [versions]
+  (let [compatible-version (compatible-db-version)]
+    (dorun (map (partial incompatible-database-conversion compatible-version)
+                (remove #(<= (compare % compatible-version) 0) versions)))))
+
 (defn- do-conversion
   "Performs a databae conversion and updates the database version."
   [new-version]
@@ -322,15 +331,17 @@
 (defn- update-database
   "Converts the database schema from one DE version to another."
   [opts]
-  (let [current-version (get-current-db-version)
-        new-version     (compatible-db-version)
-        versions        (get-update-versions current-version)]
-    (try+
-     (dorun (map do-conversion
-                 (take-while #(<= (compare % new-version) 0) versions)))
-     (catch Exception e
-       (log-next-exception e)
-       (throw+)))))
+  (with-temp-dir dir "-fp-" temp-directory-creation-failure
+    (get-build-artifact dir opts)
+    (unpack-build-artifact dir (:filename opts))
+    (set-conversions dir)
+    (let [versions (get-update-versions (get-current-db-version))]
+      (validate-update-versions versions)
+      (try+
+       (dorun (map do-conversion versions))
+       (catch Exception e
+         (log-next-exception e)
+         (throw+))))))
 
 (defn- exec-mode-fn
   "Executes the function associated with the selected mode of operation."

@@ -122,6 +122,14 @@
            :database database
            :user     user}))
 
+(defn incompatible-database-conversion
+  "Throws an exception indicating that a conversion is being done for a database
+   version that is not compatible with the current build of facepalm."
+  [compatible-version requested-version]
+  (throw+ {:type               ::incompatible-database-version
+           :requested-version  requested-version
+           :compatible-version compatible-version}))
+
 (defn error-exit
   "Prints a message to standard error output and exits with a non-zero exit
    status."

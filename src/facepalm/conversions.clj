@@ -2,67 +2,69 @@
   (:require [clojure.string :as string]
             [clojure-commons.file-utils :as fu]))
 
-(defn drop-extension
+(defn- drop-extension
   [fname]
   (first (string/split fname #"\.")))
 
-(defn split-on-underscore
+(defn- split-on-underscore
   [fname]
   (string/split fname #"_"))
 
-(defn dotize
+(defn- dotize
   [vstr]
   (string/join "." (into [] vstr)))
 
-(defn fmt-version
+(defn- fmt-version
   [[version-str date-str]]
   [(-> version-str
        (string/replace #"^c" "")
        dotize)
    date-str])
 
-(defn fmt-date-str
+(defn- fmt-date-str
   [date-str]
   (let [date-vec (into [] date-str)]
     (str
      (string/join (take 8 date-vec)) "." (string/join (take-last 2 date-vec)))))
 
-(defn fmt-date
+(defn- fmt-date
   [[vstr date-str]]
   [vstr (fmt-date-str date-str)])
 
-(defn db-version
+(defn- db-version
   [parts]
   (string/join ":" parts))
 
-(defn fname->db-version
+(defn- fname->db-version
   [fname]
   (-> fname
+      fu/basename
       drop-extension
       split-on-underscore
       fmt-version
       fmt-date
       db-version))
 
-(defn fname->ns-str
+(defn- fname->ns-str
   [fname]
   (-> (str "facepalm." fname)
       (string/replace #"\.clj$" "")
       (string/replace #"_" "-")))
 
-(defn ns-str->cv-str
+(defn- ns-str->cv-str
   [ns-str]
   (str ns-str "/convert"))
 
-(defn fname->cv-ref
+(defn- fname->cv-ref
   [fname]
   (-> fname
       fu/basename
       fname->ns-str
       ns-str->cv-str
-      symbol))
+      symbol
+      eval))
 
-(defn list-conversions
+(defn- list-conversions
   [dir]
   (filter
    #(re-seq #"^c.*_[0-9]{10}\.clj$" (fu/basename %1))
@@ -70,14 +72,13 @@
     str
     (.listFiles (clojure.java.io/file (fu/path-join dir "conversions"))))))
 
-(defn load-conversions
+(defn- load-conversions
   [cv-list]
   (doseq [cv cv-list]
     (load-file cv)))
 
 (defn conversion-map
   [dir]
-  (apply merge (map
-                #(assoc {} (fname->db-version (fu/basename %1)) (fname->cv-ref %1))
-                (list-conversions dir))))
-
+  (let [conversions (list-conversions dir)]
+    (load-conversions conversions)
+    (into {} (map #(vector (fname->db-version %) (fname->cv-ref %)) conversions))))
