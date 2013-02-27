@@ -1,6 +1,17 @@
 (ns facepalm.conversions
+  (:use [clojure.java.io :only [file reader]]
+        [cemerick.pomegranate :only [add-dependencies]])
   (:require [clojure.string :as string]
-            [clojure-commons.file-utils :as fu]))
+            [clojure-commons.file-utils :as fu])
+  (:import [java.io PushbackReader]))
+
+(def ^:private dependency-filename
+  "dependencies.clj")
+
+(def ^:private default-repositories
+  {"central" "http://repo1.maven.org/maven2"
+   "clojars" "http://clojars.org/repo/"
+   "iplant"  "http://projects.iplantcollaborative.org/archiva/repository/internal/"})
 
 (defn- drop-extension
   [fname]
@@ -70,15 +81,30 @@
    #(re-seq #"^c.*_[0-9]{10}\.clj$" (fu/basename %1))
    (map
     str
-    (.listFiles (clojure.java.io/file (fu/path-join dir "conversions"))))))
+    (.listFiles (file dir "conversions")))))
 
 (defn- load-conversions
   [cv-list]
   (doseq [cv cv-list]
     (load-file cv)))
 
+(defn- load-dependency-file
+  [f]
+  (with-open [r (PushbackReader. (reader f))]
+    (binding [*read-eval* false]
+      (read r))))
+
+(defn load-dependencies
+  [dir]
+  (let [f (file dir dependency-filename)]
+    (when (.isFile f)
+      (let [{:keys [dependencies repositories]} (load-dependency-file f)]
+        (add-dependencies :coordinates dependencies
+                          :repositories (merge default-repositories repositories))))))
+
 (defn conversion-map
   [dir]
+  (load-dependencies dir)
   (let [conversions (list-conversions dir)]
     (load-conversions conversions)
     (into {} (map #(vector (fname->db-version %) (fname->cv-ref %)) conversions))))
