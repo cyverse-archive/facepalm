@@ -41,10 +41,6 @@
   "The base URL for the QA drops."
   "http://projects.iplantcollaborative.org/qa-drops")
 
-(def ^:private build-artifact-name
-  "The name of the build artifact to retrieve."
-  "database.tar.gz")
-
 (def ^:private modes
   "The map of mode names to their helper functions."
   {:init   do-init
@@ -60,14 +56,13 @@
   "Reads in the conversions from the unpacked build artifact. Set the conversions atom
    to the conversion map."
   [unpacked-dir]
-  (println "Loading conversions...")
   (let [conversion-dir (file unpacked-dir "conversions")]
-    (when-not (.exists conversion-dir)
-      (throw+ {:error_code "ERR_DOES_NOT_EXIST" :path (str conversion-dir)}))
-    (reset! conversions (cnv/conversion-map unpacked-dir))
-    (println "Done loading conversions.")
-    (println "Here are the loaded conversions: ")
-    (println (keys @conversions))))
+    (when (.exists conversion-dir)
+      (println "Loading conversions...")
+      (reset! conversions (cnv/conversion-map unpacked-dir))
+      (println "Done loading conversions.")
+      (println "Here are the loaded conversions: ")
+      (dorun (map (partial println "   ") (keys @conversions))))))
 
 (defn- to-int
   "Parses a string representation of an integer."
@@ -86,10 +81,10 @@
         :parse-fn to-int]
        ["-d" "--database" "The database name." :default "de"]
        ["-U" "--user" "The database username." :default "de"]
-       ["-j" "--job" "The name of DE database job in Jenkins."
-        :default "database"]
+       ["-j" "--job" "The name of DE database job in Jenkins."]
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
-       ["-f" "--filename" "An explicit path to the database tarball."]
+       ["-f" "--filename" "An explicit path to the database tarball."
+        :default "database.tar.gz"]
        ["--debug" "Enable debugging." :default false :flag true]))
 
 (defn- pump
@@ -182,24 +177,21 @@
      (database-connection-failure host port database user))))
 
 (defn- jenkins-build-artifact-url
-  "Returns the URL used to obtain the build artifact from Jenkins.  We assume
-   that the name of the artifiact is database.tar.gz."
-  [job-name]
-  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/"
-       build-artifact-name))
+  "Returns the URL used to obtain the build artifact from Jenkins."
+  [job-name filename]
+  (str jenkins-base "/job/" job-name "/lastSuccessfulBuild/artifact/" filename))
 
 (defn- qa-drop-build-artifact-url
-  "Returns the URL used to obtain the build artifact from a QA drop.  We assume
-   that the name of the artifact is database.tar.gz."
-  [drop-date]
-  (str qa-drop-base "/" drop-date "/" build-artifact-name))
+  "Returns the URL used to obtain the build artifact from a QA drop."
+  [drop-date filename]
+  (str qa-drop-base "/" drop-date "/" filename))
 
 (defn- build-artifact-url
   "Builds and returns the URL used to obtain the build artifact."
   [{:keys [qa-drop filename job]}]
-  (cond (not (string/blank? qa-drop))  (qa-drop-build-artifact-url qa-drop)
-        (not (string/blank? job))      (jenkins-build-artifact-url job)
-        :else                          (options-missing :job :qa-drop :file)))
+  (cond (not (string/blank? qa-drop)) (qa-drop-build-artifact-url qa-drop filename)
+        (not (string/blank? job))     (jenkins-build-artifact-url job filename)
+        :else                         (options-missing :job :qa-drop :file)))
 
 (defn- get-remote-resource
   "Gets a remote resource using a URL."
@@ -215,7 +207,7 @@
     (if-not (< 199 status 300)
       (build-artifact-retrieval-failed status artifact-url))
     (with-open [in body]
-      (copy in (file dir build-artifact-name)))))
+      (copy in (file dir (:filename opts))))))
 
 (defn get-build-artifact-from-file
   "Gets the build artifact from a local file."
@@ -227,20 +219,20 @@
      (catch IOException e
        (database-tarball-copy-failed src dst (.getMessage e))))))
 
+
 (defn- get-build-artifact
   "Obtains the database build artifact."
-  [dir opts]
+  [dir {:keys [filename job qa-drop] :as opts}]
   (println "Retrieving the build artifact...")
-  (let [filename (:filename opts)]
-    (if (string/blank? filename)
-      (get-build-artifact-from-url dir opts)
-      (get-build-artifact-from-file dir filename))))
+  (if (every? string/blank? [qa-drop job])
+    (get-build-artifact-from-file dir filename)
+    (get-build-artifact-from-url dir opts)))
 
 (defn- unpack-build-artifact
   "Unpacks the database build artifact after it has been obtained."
-  [dir]
+  [dir filename]
   (println "Unpacking the build artifact...")
-  (let [file-path   (.getPath (file dir build-artifact-name))
+  (let [file-path   (.getPath (file dir (.getName (file filename))))
         exit-status (sh "tar" "xvf" file-path "-C" (.getPath dir))]
     (when-not (zero? exit-status)
       (build-artifact-expansion-failed))))
@@ -300,7 +292,7 @@
   [opts]
   (with-temp-dir dir "-fp-" temp-directory-creation-failure
     (get-build-artifact dir opts)
-    (unpack-build-artifact dir)
+    (unpack-build-artifact dir (:filename opts))
     (set-conversions dir)
     (transaction (apply-database-init-scripts dir opts))))
 
@@ -319,6 +311,15 @@
   (drop-while #(<= (compare % current-version) 0)
               (sort (keys @conversions))))
 
+(defn- validate-update-versions
+  "Validates the list of versions to run database conversions for.  An
+   exception will be thrown if any are not compatible with the current version
+   of kameleon."
+  [versions]
+  (let [compatible-version (compatible-db-version)]
+    (dorun (map (partial incompatible-database-conversion compatible-version)
+                (remove #(<= (compare % compatible-version) 0) versions)))))
+
 (defn- do-conversion
   "Performs a databae conversion and updates the database version."
   [new-version]
@@ -330,15 +331,17 @@
 (defn- update-database
   "Converts the database schema from one DE version to another."
   [opts]
-  (let [current-version (get-current-db-version)
-        new-version     (compatible-db-version)
-        versions        (get-update-versions current-version)]
-    (try+
-     (dorun (map do-conversion
-                 (take-while #(<= (compare % new-version) 0) versions)))
-     (catch Exception e
-       (log-next-exception e)
-       (throw+)))))
+  (with-temp-dir dir "-fp-" temp-directory-creation-failure
+    (get-build-artifact dir opts)
+    (unpack-build-artifact dir (:filename opts))
+    (set-conversions dir)
+    (let [versions (get-update-versions (get-current-db-version))]
+      (validate-update-versions versions)
+      (try+
+       (dorun (map do-conversion versions))
+       (catch Exception e
+         (log-next-exception e)
+         (throw+))))))
 
 (defn- exec-mode-fn
   "Executes the function associated with the selected mode of operation."
