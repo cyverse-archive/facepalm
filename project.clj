@@ -10,7 +10,7 @@
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
                  [com.cemerick/pomegranate "0.0.13"]
-                 [fleet "0.9.5"]
+                 [fleet "0.10.1"]
                  [korma "0.3.0-RC2"]
                  [org.iplantc/clojure-commons "1.4.0-SNAPSHOT"]
                  [org.iplantc/kameleon "0.1.3-SNAPSHOT"]
