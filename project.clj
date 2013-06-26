@@ -17,7 +17,7 @@
                  [postgresql "9.0-801.jdbc4"]
                  [slingshot "0.10.3"]
                  [clj-http "0.6.3"]]
-  :plugins [[org.iplantc/lein-iplant-cmdtar "0.1.0-SNAPSHOT"]
+  :plugins [[org.iplantc/lein-iplant-cmdtar "0.1.1-SNAPSHOT"]
             [org.iplantc/lein-iplant-rpm "1.4.3-SNAPSHOT"]
             [lein-marginalia "0.7.1"]]
   :iplant-rpm {:summary "Facepalm"
