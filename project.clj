@@ -3,13 +3,13 @@
 ;; changes need to be recorded in the version number.  Please increment the
 ;; minor version number rather than the release number for minor changes.
 
-(defproject facepalm "1.2.4-SNAPSHOT"
+(defproject facepalm "1.2.5-SNAPSHOT"
   :description "Command-line utility for DE database managment."
   :dependencies [[org.clojure/clojure "1.4.0"]
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
                  [com.cemerick/pomegranate "0.0.13"]
-                 [fleet "0.10.1-jvm1.6"]
+                 [fleet "0.9.5"]
                  [korma "0.3.0-RC2"]
                  [org.iplantc/clojure-commons "1.4.0-SNAPSHOT"]
                  [org.iplantc/kameleon "0.1.3-SNAPSHOT"]
