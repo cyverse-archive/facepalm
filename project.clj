@@ -6,11 +6,11 @@
 
 (defproject facepalm "1.2.4-SNAPSHOT"
   :description "Command-line utility for DE database managment."
-  :dependencies [[org.clojure/clojure "1.4.0"]
+  :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
                  [com.cemerick/pomegranate "0.0.13"]
-                 [fleet "0.10.1-iplant"]
+                 [fleet "0.10.1"]
                  [korma "0.3.0-RC2"]
                  [org.iplantc/clojure-commons "1.4.0-SNAPSHOT"]
                  [org.iplantc/kameleon "0.1.3-SNAPSHOT"]
