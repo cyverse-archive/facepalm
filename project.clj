@@ -1,4 +1,3 @@
-
 ;; IMPORTANT NOTE: Both an RPM and a tarball are generated for this project.
 ;; Because the release number is not recorded anywhere in the tarball, minor
 ;; changes need to be recorded in the version number.  Please increment the
@@ -10,7 +9,7 @@
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
                  [com.cemerick/pomegranate "0.0.13"]
-                 [fleet "0.10.1"]
+                 [fleet "0.10.1-jvm1.6"]
                  [korma "0.3.0-RC2"]
                  [org.iplantc/clojure-commons "1.4.0-SNAPSHOT"]
                  [org.iplantc/kameleon "0.1.3-SNAPSHOT"]
