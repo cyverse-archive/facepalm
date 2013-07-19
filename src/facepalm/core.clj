@@ -85,6 +85,7 @@
        ["-q" "--qa-drop" "The QA drop date to use when retrieving"]
        ["-f" "--filename" "An explicit path to the database tarball."
         :default "database.tar.gz"]
+       ["-v" "--version" "The destination database version"]
        ["--debug" "Enable debugging." :default false :flag true]))
 
 (defn- pump
@@ -307,9 +308,14 @@
 
 (defn- get-update-versions
   "Gets the list of versions to run database conversions for."
-  [current-version]
-  (drop-while #(<= (compare % current-version) 0)
-              (sort (keys @conversions))))
+  [current-version dest-version]
+  (let [sorted-versions  (sort (keys @conversions))
+        dest-version     (or dest-version (last sorted-versions))
+        existing-version #(<= (compare % current-version) 0)
+        wanted-version   #(<= (compare % dest-version) 0)]
+    (->> sorted-versions
+         (drop-while existing-version)
+         (take-while wanted-version))))
 
 (defn- validate-update-versions
   "Validates the list of versions to run database conversions for.  An
@@ -335,7 +341,7 @@
     (get-build-artifact dir opts)
     (unpack-build-artifact dir (:filename opts))
     (set-conversions dir)
-    (let [versions (get-update-versions (get-current-db-version))]
+    (let [versions (get-update-versions (get-current-db-version) (:version opts))]
       (validate-update-versions versions)
       (try+
        (dorun (map do-conversion versions))
