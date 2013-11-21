@@ -13,7 +13,7 @@
                  [fleet "0.9.5"]
                  [korma "0.3.0-RC2"]
                  [org.iplantc/clojure-commons "1.4.0-SNAPSHOT"]
-                 [org.iplantc/kameleon "2.0.0-SNAPSHOT"]
+                 [org.iplantc/kameleon "1.8.4-SNAPSHOT"]
                  [postgresql "9.0-801.jdbc4"]
                  [slingshot "0.10.3"]
                  [clj-http "0.6.3"]]
