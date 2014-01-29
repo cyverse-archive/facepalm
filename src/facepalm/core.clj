@@ -35,11 +35,11 @@
 
 (def ^:private jenkins-base
   "The base URL used to connect to Jenkins."
-  "http://projects.iplantcollaborative.org/hudson")
+  "http://watson.iplantcollaborative.org/hudson")
 
 (def ^:private qa-drop-base
   "The base URL for the QA drops."
-  "http://projects.iplantcollaborative.org/qa-drops")
+  "http://katic.iplantcollaborative.org/qa-drops")
 
 (def ^:private modes
   "The map of mode names to their helper functions."
