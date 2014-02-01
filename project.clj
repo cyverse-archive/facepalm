@@ -3,7 +3,7 @@
 ;; changes need to be recorded in the version number.  Please increment the
 ;; minor version number rather than the release number for minor changes.
 
-(defproject org.iplantc/facepalm "2.0.0-SNAPSHOT"
+(defproject org.iplantc/facepalm "2.0.0"
   :description "Command-line utility for DE database managment."
   :url "http://www.iplantcollaborative.org"
   :license {:name "BSD"
