@@ -18,13 +18,13 @@
                  [com.cemerick/pomegranate "0.0.13"]
                  [fleet "0.9.5"]
                  [korma "0.3.0-RC2"]
-                 [org.iplantc/clojure-commons "1.4.8-SNAPSHOT"]
-                 [org.iplantc/kameleon "1.8.4-SNAPSHOT"]
+                 [org.iplantc/clojure-commons "1.4.8"]
+                 [org.iplantc/kameleon "1.8.4"]
                  [postgresql "9.0-801.jdbc4"]
                  [slingshot "0.10.3"]
                  [clj-http "0.6.3"]]
-  :plugins [[org.iplantc/lein-iplant-cmdtar "0.1.2-SNAPSHOT"]
-            [org.iplantc/lein-iplant-rpm "1.4.3-SNAPSHOT"]
+  :plugins [[org.iplantc/lein-iplant-cmdtar "0.1.2"]
+            [org.iplantc/lein-iplant-rpm "1.4.3"]
             [lein-marginalia "0.7.1"]]
   :iplant-rpm {:summary "Facepalm"
                :type :command}
