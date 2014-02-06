@@ -12,6 +12,9 @@
   :scm {:connection "scm:git:git@github.com:iPlantCollaborativeOpenSource/facepalm.git"
         :developerConnection "scm:git:git@github.com:iPlantCollaborativeOpenSource/facepalm.git"
         :url "git@github.com:iPlantCollaborativeOpenSource/facepalm.git"}
+  :pom-addition [:developers
+                 [:developer
+                  [:url "https://github.com/orgs/iPlantCollaborativeOpenSource/teams/iplant-devs"]]]
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.cli "0.2.1"]
                  [org.clojure/tools.logging "0.2.3"]
